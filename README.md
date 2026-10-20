@@ -3,8 +3,8 @@
 A macOS menu bar monitor that shows **which apps** are using your CPU, GPU, memory, disk and network over time. Each app gets its own layer in a stacked chart, so you can see who caused a spike, not just that one happened.
 
 <div align="center">
-  <img src="docs/image.png" height="480" alt="Stacks in the menu bar with its panel open, showing stacked per-app charts for CPU, GPU, memory, disk and network">
   <img src="docs/APM.png" height="480" alt="The APM panel: actions per minute now, today's average and peak, league rank, activity by hour and daily input stats">
+  <img src="docs/image.png" height="480" alt="Stacks in the menu bar with its panel open, showing stacked per-app charts for CPU, GPU, memory, disk and network">
 </div>
 
 ## Requirements
