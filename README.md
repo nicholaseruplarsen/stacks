@@ -2,9 +2,33 @@
 
 A macOS menu bar monitor that shows **which apps** are using your CPU, GPU, memory, disk and network over time. Each app gets its own layer in a stacked chart, so you can see who caused a spike, not just that one happened.
 
-<div align="center"><img src="docs/menubar.png" width="446" alt="Stacks' menu bar items: APM, CPU, GPU, RAM, temperature, disk, network and battery"></div>
-<br>
-<div align="center"><img src="docs/apps.png" width="360" alt="The Stacks panel showing stacked per-app charts for CPU, GPU, memory, disk and network"></div>
+<div align="center"><img src="docs/image.png" width="446" alt="Stacks in the menu bar with its panel open, showing stacked per-app charts for CPU, GPU, memory, disk and network"></div>
+
+## Requirements
+
+- An Apple silicon Mac running macOS 14 or later.
+- Apple's Command Line Tools with the macOS 26 SDK. You don't need full Xcode.
+
+## Download
+
+Get `Stacks-1.0.0.dmg` from the [latest release](https://github.com/nicholaseruplarsen/stacks/releases/latest), open it and drag Stacks into Applications.
+
+Stacks isn't notarized by Apple, so the first time you open it macOS will refuse. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You can also clear the download flag in Terminal instead:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Stacks.app
+```
+
+## Build from source
+
+```bash
+xcode-select --install   # if you don't have the Command Line Tools yet
+./build.sh
+cp -R build/Stacks.app /Applications/
+open /Applications/Stacks.app
+```
+
+`./make-dmg.sh` builds the app and packages it as `build/Stacks-<version>.dmg`.
 
 ## Features
 
@@ -17,20 +41,6 @@ A macOS menu bar monitor that shows **which apps** are using your CPU, GPU, memo
 - **APM**: counts actions per minute, as in StarCraft, with an hourly breakdown, a league rank, flow streaks, peak typing speed and pointer travel. It counts how many keys you press, never which, and needs no permissions.
 - **Adjustable sampling**, from 500 ms to 10 s, with a live estimate of what each speed costs in CPU and memory.
 - **Imports totals from Stats**: your network and energy totals carry over if you're switching from Stats.
-
-## Requirements
-
-- An Apple silicon Mac running macOS 14 or later.
-- Apple's Command Line Tools with the macOS 26 SDK. You don't need full Xcode.
-
-## Build and install
-
-```bash
-xcode-select --install   # if you don't have the Command Line Tools yet
-./build.sh
-cp -R build/Stacks.app /Applications/
-open /Applications/Stacks.app
-```
 
 Stacks adds itself to your login items the first time it runs. You can turn that off in the panel's settings (the gear icon).
 
