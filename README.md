@@ -4,6 +4,8 @@ A macOS menu bar monitor that shows **which apps** are using your CPU, GPU, memo
 
 <div align="center"><img src="docs/image.png" width="446" alt="Stacks in the menu bar with its panel open, showing stacked per-app charts for CPU, GPU, memory, disk and network"></div>
 
+<div align="center"><img src="docs/APM.png" width="320" alt="The APM panel: actions per minute now, today's average and peak, league rank, activity by hour and daily input stats"></div>
+
 ## Requirements
 
 - An Apple silicon Mac running macOS 14 or later.
