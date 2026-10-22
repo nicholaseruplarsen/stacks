@@ -11,6 +11,7 @@ struct Sample {
     let disk: [String: Double]  // bytes/s read+written (own-user processes only)
     let net: [String: Double]   // bytes/s in+out
     let compressed: [String: Double]  // bytes before compression, refreshed every minute
+    let appPower: [String: Double]    // watts, estimated (see `attributePower`)
 
     let cpuUser: Double, cpuSystem: Double    // fractions of all cores
     let gpuUtil: Double                       // 0...1
@@ -81,6 +82,8 @@ final class Sampler {
     private var prevDisk: [pid_t: UInt64] = [:]
     private var prevNet: [pid_t: UInt64] = [:]
     private var prevGPU: [UInt64: UInt64] = [:]
+    private var prevEnergy: [pid_t: UInt64] = [:]
+    private var prevDeniedCPU: [pid_t: UInt64] = [:]
     private var groups: [pid_t: String] = [:]
     private let numer: UInt64
     private let denom: UInt64
@@ -181,12 +184,15 @@ final class Sampler {
         // Per-process CPU, memory, disk.
         var cpuNow: [pid_t: UInt64] = [:]
         var diskNow: [pid_t: UInt64] = [:]
+        var energyNow: [pid_t: UInt64] = [:]
+        var deniedCPUNow: [pid_t: UInt64] = [:]
         var mem: [String: Double] = [:]
         var denied: [pid_t] = [0]
         for pid in listPids() {
             if let s = ownStats(pid) {
                 cpuNow[pid] = s.cpu
                 diskNow[pid] = s.disk
+                energyNow[pid] = s.energy
                 mem[group(pid), default: 0] += Double(s.footprint)
             } else {
                 denied.append(pid)
@@ -194,11 +200,14 @@ final class Sampler {
         }
         for (pid, ns, rss) in psStats(denied) {
             cpuNow[pid] = ns
+            deniedCPUNow[pid] = ns
             mem[group(pid), default: 0] += rss
         }
         let cpu = rates(cpuNow, &prevCPU, per: dtNs)
         let disk = rates(diskNow, &prevDisk, per: dt)
         let net = rates(nettop(), &prevNet, per: dt)
+        let ownWatts = rates(energyNow, &prevEnergy, per: dt * 1e9)
+        let deniedCPU = rates(deniedCPUNow, &prevDeniedCPU, per: dtNs)
 
         let g = gpuStats()
         var gpu: [String: Double] = [:]
@@ -282,8 +291,10 @@ final class Sampler {
         let (keysPM, clicksPM, apm, wpm) = readInput(&snap, dt: dt)
 
         guard dt > 0 else { return }
+        let appPower = attributePower(own: ownWatts, denied: deniedCPU, gpu: gpu, snap: snap)
         let sample = Sample(
             t: Date(), cpu: trim(cpu), gpu: trim(gpu), mem: trim(mem), disk: trim(disk), net: trim(net), compressed: compressed,
+            appPower: trim(appPower),
             cpuUser: snap.cpu.user, cpuSystem: snap.cpu.system, gpuUtil: snap.gpuUtil,
             ramApp: snap.ram.app, ramWired: snap.ram.wired, ramCompressed: snap.ram.compressed, ramTotal: snap.ram.total,
             diskRead: diskRead, diskWrite: diskWrite, netIn: netIn, netOut: netOut,
@@ -356,6 +367,21 @@ final class Sampler {
         return out
     }
 
+    /// Per-app power in watts. CPU energy is measured per process by the kernel for
+    /// processes we can read; CPU power the package used beyond that is split among
+    /// the other users' processes (WindowServer, daemons) by CPU time. GPU power is
+    /// split by each app's share of GPU time. Display, memory and the rest of the
+    /// system aren't attributed to any app.
+    private func attributePower(own: [String: Double], denied: [String: Double], gpu: [String: Double], snap: Snapshot) -> [String: Double] {
+        var out = own
+        let residual = max(0, snap.powerCPU - own.values.reduce(0, +))
+        let deniedTotal = denied.values.reduce(0, +)
+        if deniedTotal > 0 { for (g, c) in denied { out[g, default: 0] += residual * c / deniedTotal } }
+        let gpuTotal = gpu.values.reduce(0, +)
+        if gpuTotal > 0 { for (g, v) in gpu { out[g, default: 0] += snap.powerGPU * v / gpuTotal } }
+        return out
+    }
+
     private func trim(_ d: [String: Double]) -> [String: Double] {
         let sorted = d.filter { $0.value > 0 }.sorted { $0.value > $1.value }
         var out: [String: Double] = [:]
@@ -375,16 +401,16 @@ final class Sampler {
         return pids.prefix(Int(max(got, 0))).filter { $0 > 0 }
     }
 
-    private func ownStats(_ pid: pid_t) -> (cpu: UInt64, footprint: UInt64, disk: UInt64)? {
-        var ri = rusage_info_v4()
+    private func ownStats(_ pid: pid_t) -> (cpu: UInt64, footprint: UInt64, disk: UInt64, energy: UInt64)? {
+        var ri = rusage_info_v6()
         let r = withUnsafeMutablePointer(to: &ri) {
             $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) {
-                proc_pid_rusage(pid, RUSAGE_INFO_V4, $0)
+                proc_pid_rusage(pid, RUSAGE_INFO_V6, $0)
             }
         }
         guard r == 0 else { return nil }
         let ticks = ri.ri_user_time + ri.ri_system_time
-        return (ticks * numer / denom, ri.ri_phys_footprint, ri.ri_diskio_bytesread + ri.ri_diskio_byteswritten)
+        return (ticks * numer / denom, ri.ri_phys_footprint, ri.ri_diskio_bytesread + ri.ri_diskio_byteswritten, ri.ri_energy_nj)
     }
 
     private func run(_ path: String, _ args: [String]) -> String {

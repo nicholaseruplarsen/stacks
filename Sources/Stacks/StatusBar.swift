@@ -415,6 +415,15 @@ enum Fmt {
         return g >= 1 ? String(format: "%.2f GB", g) : String(format: "%.0f MB", b / 1_048_576)
     }
 
+    static func watts(_ w: Double) -> String {
+        w >= 10 ? String(format: "%.1f W", w) : w >= 1 ? String(format: "%.2f W", w) : String(format: "%.0f mW", w * 1000)
+    }
+
+    static func wattHours(_ j: Double) -> String {
+        let wh = j / 3600
+        return wh >= 1 ? String(format: "%.1f Wh", wh) : String(format: "%.0f mWh", wh * 1000)
+    }
+
     static func duration(_ seconds: TimeInterval) -> String {
         let f = DateComponentsFormatter()
         f.allowedUnits = seconds >= 86400 ? [.day, .hour, .minute] : [.hour, .minute]

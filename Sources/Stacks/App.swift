@@ -88,7 +88,7 @@ private func migrateDefaults() {
 // MARK: - Per-app chart data
 
 enum AppMetric: String, CaseIterable, Identifiable {
-    case cpu = "CPU", gpu = "GPU", mem = "Memory", disk = "Disk", net = "Network", compressed = "Compressed"
+    case cpu = "CPU", gpu = "GPU", mem = "Memory", disk = "Disk", net = "Network", compressed = "Compressed", energy = "Power"
 
     /// The charts on the Apps tab.
     static let apps: [AppMetric] = [.cpu, .gpu, .mem, .disk, .net]
@@ -102,6 +102,7 @@ enum AppMetric: String, CaseIterable, Identifiable {
         case .disk: s.disk
         case .net: s.net
         case .compressed: s.compressed.mapValues { $0 / 1_073_741_824 }
+        case .energy: s.appPower
         }
     }
 
@@ -113,6 +114,7 @@ enum AppMetric: String, CaseIterable, Identifiable {
         case .disk: Fmt.byteRate(v)
         case .net: Fmt.bitRate(v)
         case .compressed: v >= 1 ? String(format: "%.2f GB", v) : String(format: "%.0f MB", v * 1024)
+        case .energy: Fmt.watts(v)
         }
     }
 
@@ -124,6 +126,7 @@ enum AppMetric: String, CaseIterable, Identifiable {
         case .disk: "B/s"
         case .net: "B/s"
         case .compressed: "GB"
+        case .energy: "W"
         }
     }
 
@@ -131,6 +134,7 @@ enum AppMetric: String, CaseIterable, Identifiable {
         switch self {
         case .disk: "Your own processes only; system daemons aren't visible without root."
         case .compressed: "Original size of each app's compressed pages. Refreshed every minute."
+        case .energy: "CPU energy is measured per process; GPU power is split by GPU time. Display and memory aren't counted."
         default: nil
         }
     }

@@ -13,6 +13,7 @@ final class Store {
     var powerAvg = 0.0
     var day: InputDay
     var inputAllTime: InputTotals
+    var battery: BatterySession
 
     @ObservationIgnored private var powerN = 0.0
     @ObservationIgnored private var unsaved = 0
@@ -26,6 +27,7 @@ final class Store {
         netTotalOut = defaults.double(forKey: "netTotalOut")
         energyWh = defaults.double(forKey: "energyWh")
         day = (defaults.data(forKey: "inputDay")).flatMap { try? JSONDecoder().decode(InputDay.self, from: $0) } ?? InputDay()
+        battery = (defaults.data(forKey: "batterySession")).flatMap { try? JSONDecoder().decode(BatterySession.self, from: $0) } ?? BatterySession()
         inputAllTime = (defaults.data(forKey: "inputAllTime")).flatMap { try? JSONDecoder().decode(InputTotals.self, from: $0) } ?? InputTotals()
         if !defaults.bool(forKey: "importedStats") {
             importFromStats()
@@ -48,6 +50,7 @@ final class Store {
             powerAvg += (s.power - powerAvg) / powerN
         }
         foldInput(s, snap.input)
+        foldBattery(s, snap)
         unsaved += 1
         if unsaved >= 15 { save() }
     }
@@ -59,6 +62,24 @@ final class Store {
         defaults.set(energyWh, forKey: "energyWh")
         defaults.set(try? JSONEncoder().encode(day), forKey: "inputDay")
         defaults.set(try? JSONEncoder().encode(inputAllTime), forKey: "inputAllTime")
+        defaults.set(try? JSONEncoder().encode(battery), forKey: "batterySession")
+    }
+
+    /// Energy per app since the Mac was last unplugged. A new session starts on
+    /// each unplug; while plugged in, the last session stays on show.
+    private func foldBattery(_ s: Sample, _ snap: Snapshot) {
+        let onBattery = !snap.battery.external
+        defer { battery.onBattery = onBattery }
+        guard onBattery else { return }
+        if !battery.onBattery || battery.start == nil {
+            battery = BatterySession(start: s.t, startLevel: s.battery, onBattery: true)
+        }
+        guard samples.count > 1 else { return }
+        let dt = min(s.t.timeIntervalSince(samples[samples.count - 2].t), 30)
+        for (app, w) in s.appPower { battery.joules[app, default: 0] += w * dt }
+        battery.systemJ += s.power * dt
+        battery.end = s.t
+        battery.endLevel = s.battery
     }
 
     private func foldInput(_ s: Sample, _ d: InputDelta) {
@@ -222,4 +243,16 @@ struct InputTotals: Codable {
     var actions = 0, keys = 0
     var travelMM = 0.0
     var since: Date?
+}
+
+struct BatterySession: Codable {
+    var start: Date?
+    var startLevel = 0.0
+    var onBattery = false
+    var end: Date?
+    var endLevel = 0.0
+    var joules: [String: Double] = [:]   // per app
+    var systemJ = 0.0                    // whole system, from the SMC's total power reading
+
+    var duration: TimeInterval { start.flatMap { s in end.map { $0.timeIntervalSince(s) } } ?? 0 }
 }

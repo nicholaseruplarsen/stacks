@@ -943,6 +943,10 @@ struct BatteryPanel: View {
                 Row(label: "Current", value: String(format: "%.0f mA", b.adapterCurrent * 1000))
                 Row(label: "Voltage", value: String(format: "%.2f V", b.adapterVoltage))
             }
+
+            SectionTitle("Energy by app")
+            AppChart(metric: .energy, store: store, window: window, title: "Power", height: 64)
+            BatteryUsage(session: store.battery)
         }
     }
 
@@ -1206,5 +1210,56 @@ struct HourBars: View {
             }
             .font(.caption2).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Which apps used the battery since the Mac was last unplugged.
+struct BatteryUsage: View {
+    let session: BatterySession
+
+    var body: some View {
+        let apps = session.joules.filter { $0.value > 0 }.sorted { $0.value > $1.value }
+        let appsJ = apps.reduce(0) { $0 + $1.value }
+        let total = max(session.systemJ, appsJ)
+        let top = Array(apps.prefix(8))
+        let restJ = apps.dropFirst(8).reduce(0) { $0 + $1.value }
+        let colors = Palette.assign(top.map(\.key))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(session.onBattery ? "Since unplugged" : "Last time on battery").font(.headline)
+                Spacer()
+                if session.start != nil {
+                    Text(summary(total)).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+            }
+            if top.isEmpty {
+                Text("Unplug your Mac to see which apps use the battery.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                ForEach(top, id: \.key) { app, j in
+                    usageRow(app, j, total, colors[app] ?? Palette.other)
+                }
+                if restJ > 0 { usageRow("Other apps", restJ, total, Palette.other) }
+                if total - appsJ > 0 { usageRow("Display & hardware", total - appsJ, total, .secondary.opacity(0.4)) }
+            }
+        }
+    }
+
+    private func usageRow(_ name: String, _ j: Double, _ total: Double, _ color: Color) -> some View {
+        HStack(spacing: 8) {
+            Text(name).lineLimit(1).truncationMode(.middle).frame(width: 130, alignment: .leading)
+            Bar(fraction: total > 0 ? j / total : 0, color: color)
+            Text(Fmt.wattHours(j)).monospacedDigit().frame(width: 62, alignment: .trailing)
+            Text(String(format: "%.0f%%", total > 0 ? j / total * 100 : 0)).monospacedDigit().foregroundStyle(.secondary)
+                .frame(width: 34, alignment: .trailing)
+        }
+        .font(.system(size: 12))
+    }
+
+    /// "1h 12m · 9.8 Wh · 100% → 71%"
+    private func summary(_ total: Double) -> String {
+        let m = Int(session.duration / 60)
+        let time = m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
+        return "\(time) · \(Fmt.wattHours(total)) · \(Int((session.startLevel * 100).rounded()))% → \(Int((session.endLevel * 100).rounded()))%"
     }
 }

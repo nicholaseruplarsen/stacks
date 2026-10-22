@@ -41,6 +41,7 @@ open /Applications/Stacks.app
 - **Click to copy**: click a legend row to copy that app's name and usage, or click a chart to copy everything at that moment. Hover over **Other** to see what's inside it.
 - **Menu bar items** for CPU, GPU, memory pressure, temperature, disk, network, battery and APM. They turn yellow through orange-red as load rises. Drag the tabs in the panel to reorder them.
 - **System panels** for CPU (per core, frequency, power), GPU, RAM (pressure history, compressed memory per app), disk, network (interface, ping history, public IP), battery and sensors (temperatures, voltages, power).
+- **Energy by app**: a stacked power chart per app, and a breakdown of which apps used how much battery since you last unplugged. CPU energy comes from the kernel's per-process energy counters; GPU power is split by each app's GPU time.
 - **APM**: counts actions per minute, as in StarCraft, with an hourly breakdown, a league rank, flow streaks, peak typing speed and pointer travel. It counts how many keys you press, never which, and needs no permissions.
 - **Adjustable sampling**, from 500 ms to 10 s, with a live estimate of what each speed costs in CPU and memory.
 - **Imports totals from Stats**: your network and energy totals carry over if you're switching from Stats.
